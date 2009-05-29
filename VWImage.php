@@ -40,6 +40,7 @@ class VWImage
     private $font_size; // 文字サイズ(px)
     private $color;     // 文字色
     private $bg_color;  // 背景色
+    private $alpha;     // 透過度
     private $format;    // 画像形式
 
     private $lines;
@@ -56,6 +57,7 @@ class VWImage
      *  - font-size : 文字サイズ       (40)
      *  - color     : 文字色           (000000)
      *  - bg-color  : 背景色           (FFFFFF)
+     *  - alpha     ; 透過度           (0)
      *  - format    : 画像フォーマット (png)
      *  - width     : 画像幅
      *  - height    : 画像高
@@ -74,6 +76,7 @@ class VWImage
         $this->font_size = isset($params['font-size']) ? $params['font-size'] : $default_styles['font-size'];
         $this->color     = isset($params['color'])     ? $params['color']     : $default_styles['color'];
         $this->bg_color  = isset($params['bg-color'])  ? $params['bg-color']  : $default_styles['bg-color'];
+        $this->alpha     = isset($params['alpha'])     ? $params['alpha']     : $default_styles['alpha'];
         $this->format    = isset($params['format'])    ? $params['format']    : $default_styles['format'];
         $this->width     = isset($params['width'])     ? $params['width']     : $this->calc_image_width();
         $this->height    = isset($params['height'])    ? $params['height']    : $this->calc_image_height();
@@ -243,6 +246,7 @@ class VWImage
                      'font-size' => 40,
                      'color'     => '000000',
                      'bg-color'  => 'FFFFFF',
+                     'alpha'     => 0,
                      'format'    => self::PNG_FORMAT,
                      'scale'     => 2);
     }
@@ -275,6 +279,14 @@ class VWImage
                 throw new VHInvalidParameterException("invalid bg-color: {$bg_color}");
             }
             $clean['bg-color'] = $bg_color;
+        }
+
+        if(isset($params['alpha'])) {
+            $alpha = $params['alpha'];
+            if(!ctype_digit($alpha) || $alpha < 0 || $alpha > 127) {
+                throw new VHInvalidParameterException("invalid alpha: {$alpha}");
+            }
+            $clean['alpha'] = $alpha;
         }
 
         if(isset($params['width'])) {
