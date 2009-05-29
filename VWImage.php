@@ -324,6 +324,14 @@ class VWImage
             }
             $clean['font'] = $font;
         }
+
+        if(isset($params['format'])) {
+            $format = $params['format'];
+            if(!in_array($format, array(self::PNG_FORMAT, self::GIF_FORMAT, self::JPG_FORMAT))) {
+                throw new VHInvalidParameterException("invalid format: {$format}");
+            }
+            $clean['format'] = $format;;
+        }
         return $clean;
     }
 
