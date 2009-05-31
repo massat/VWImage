@@ -41,7 +41,6 @@ class VWImage
     private $color;     // 文字色
     private $bg_color;  // 背景色
     private $alpha;     // 透過度
-    private $format;    // 画像形式
 
     private $lines;
     private $image;
@@ -58,7 +57,6 @@ class VWImage
      *  - color     : 文字色           (000000)
      *  - bg-color  : 背景色           (FFFFFF)
      *  - alpha     ; 透過度           (0)
-     *  - format    : 画像フォーマット (png)
      *  - width     : 画像幅
      *  - height    : 画像高
      *  - align     : 水平位置         (right)
@@ -77,14 +75,11 @@ class VWImage
         $this->color     = isset($params['color'])     ? $params['color']     : $default_styles['color'];
         $this->bg_color  = isset($params['bg-color'])  ? $params['bg-color']  : $default_styles['bg-color'];
         $this->alpha     = isset($params['alpha'])     ? $params['alpha']     : $default_styles['alpha'];
-        $this->format    = isset($params['format'])    ? $params['format']    : $default_styles['format'];
         $this->width     = isset($params['width'])     ? $params['width']     : $this->calc_image_width();
         $this->height    = isset($params['height'])    ? $params['height']    : $this->calc_image_height();
         $this->align     = isset($params['align'])     ? $params['align']     : $default_styles['align'];
         $this->valign    = isset($params['valign'])    ? $params['valign']    : $default_styles['valign'];
         $this->font      = isset($params['font'])      ? $params['font']      : $default_styles['font'];
-
-        $this->create_image();
     }
 
     /**
@@ -97,39 +92,19 @@ class VWImage
     }
 
     /**
-     * 画像データを返すメソッド
-     * コンストラクタで指定した画像形式のバイナリデータを返す
-     *
-     * @return string
-     */
-    public function image_data()
-    {
-        $image_data = null;
-        switch($this->format) {
-            case self::PNG_FORMAT:
-                $image_data = $this->to_png();
-                break;
-            case self::GIF_FORMAT:
-                $image_data = $this->to_gif();
-                break;
-            case self::JPG_FORMAT:
-                $image_data = $this->to_jpg();
-                break;
-        }
-        return $image_data;
-    }
-
-    /**
      * 画像データをPNG形式で取得するメソッド
      *
      * @return string
      */
     public function to_png()
     {
+        $this->create_image(self::PNG_FORMAT);
+
         ob_start();
         imagepng($this->image, null, 1);
         $data = ob_get_contents();
         ob_end_clean();
+
         return $data;
     }
 
@@ -140,10 +115,14 @@ class VWImage
      */
     public function to_gif()
     {
+        $this->alpha = 0; // alphaはpngのみ対応
+        $this->create_image(self::GIF_FORMAT);
+
         ob_start();
         imagegif($this->image);
         $data = ob_get_contents();
         ob_end_clean();
+
         return $data;
     }
 
@@ -154,50 +133,48 @@ class VWImage
      */
     public function to_jpg()
     {
+        $this->alpha = 0; // alphaはpngのみ対応
+        $this->create_image(self::JPG_FORMAT);
+
         ob_start();
         imagejpeg($this->image);
         $data = ob_get_contents();
         ob_end_clean();
-        return $data;
-    }
 
-    /**
-     * コンストラクタで指定した画像形式を取得するメソッド
-     *
-     * @return string png|gif|jpg
-     */
-    public function get_format() {
-        return $this->format;
+        return $data;
     }
 
     //////////////////////////////////////////////////////
     // P R I V A T E   M E T H O D S
     //////////////////////////////////////////////////////
 
-    // 画像生成 /////////////////
+    // 画像生成
 
-    private function create_image()
+    private function create_image($format)
     {
-        $this->create_image_base();
-        $this->paste_strings();
+        $this->create_image_base($format);
+        $this->paste_strings($format);
     }
 
-    private function create_image_base()
+    private function create_image_base($format)
     {
-        $image           = imagecreatetruecolor($this->width, $this->height);
+        $image           = imageCreateTrueColor($this->width, $this->height);
         list($r, $g, $b) = self::hex_to_rgb($this->bg_color);
+        $background      = imageColorAllocateAlpha($image, $r, $g, $b, $this->alpha);
 
-        $background = imagecolorallocate($image, $r, $g, $b);
-        imagefilledrectangle($image, 0, 0, $this->width, $this->height, $background);
+        imageLayerEffect($image, IMG_EFFECT_REPLACE);
+        imageFilledRectangle($image, 0, 0, $this->width, $this->height, $background);
+        imageSaveAlpha($image, true);
 
         $this->image = $image;
     }
 
-    private function paste_strings()
+    private function paste_strings($format)
     {
-        $offset_x = $this->calc_offset_x();
-        $offset_y = $this->calc_offset_y();
+        $offset_x    = $this->calc_offset_x();
+        $offset_y    = $this->calc_offset_y();
         $this->lines = array_reverse($this->lines);
+
         foreach($this->lines as $i => $string) {
             $offset_x += $i * $this->font_size;
             $this->paste_string($string, $offset_x, $offset_y);
@@ -208,12 +185,12 @@ class VWImage
     private function paste_string($string, $offset_x, $offset_y)
     {
         $canvas_size        = self::$canvas_size;
-        $canvas             = imagecreatetruecolor($canvas_size, $canvas_size);
+        $canvas             = imageCreateTrueColor($canvas_size, $canvas_size);
 
         $bg_color           = self::hex_to_rgb($this->bg_color);
+        $bg_color           = imageColorAllocateAlpha($canvas, $bg_color[0], $bg_color[1], $bg_color[2], $this->alpha);
         $color              = self::hex_to_rgb($this->color);
-        $bg_color           = imagecolorallocate($canvas, $bg_color[0], $bg_color[1], $bg_color[2]);
-        $color              = imagecolorallocate($canvas, $color[0], $color[1], $color[2]);
+        $color              = imageColorAllocate($canvas, $color[0], $color[1], $color[2]);
 
         $length             = mb_strlen($string, self::$encoding);
 
@@ -221,7 +198,10 @@ class VWImage
             $char  = mb_substr($string, $i, 1, self::$encoding);
             $y     = $offset_y + $i * $this->font_size;
 
+            imageLayerEffect($canvas, IMG_EFFECT_REPLACE);
             imageFilledRectangle($canvas, 0, 0, $canvas_size, $canvas_size, $bg_color);  // 背景色で塗りつぶして使いまわす
+
+            imageLayerEffect($canvas, IMG_EFFECT_ALPHABLEND);
             imageTTFText($canvas, $canvas_size * 72 / 96, 0, 0, $canvas_size * 0.9, $color, $this->font, $char);
             
             // 一部の文字は回転
@@ -229,6 +209,7 @@ class VWImage
                 $canvas = imagerotate($canvas, $angle, $bg_color, true);
             }
             imageCopyResampled($this->image, $canvas, $offset_x, $y, 0, 0, $this->font_size, $this->font_size, $canvas_size, $canvas_size);
+            imagesavealpha($this->image, true);
         }
         imagedestroy($canvas);
     }
@@ -258,7 +239,7 @@ class VWImage
         if(isset($params['font-size'])) {
             $font_size = $params['font-size'];
             if(!ctype_digit($font_size) || !$font_size) {
-                throw new VHInvalidParameterException("invalid font-size: {$font_size}");
+                throw new VWInvalidParameterException("invalid font-size: {$font_size}");
             }
             $clean['font-size'] = $font_size;
         }
@@ -267,7 +248,7 @@ class VWImage
             $color  = $params['color'];
             $length = strlen($color);
             if(!preg_match('/^[0-9a-f]+$/i', $color) || $length != 6) {
-                throw new VHInvalidParameterException("invalid color: {$color}");
+                throw new VWInvalidParameterException("invalid color: {$color}");
             }
             $clean['color'] = $color;
         }
@@ -276,7 +257,7 @@ class VWImage
             $bg_color  = $params['bg-color'];
             $length = strlen($bg_color);
             if(!preg_match('/^[0-9a-f]+$/i', $bg_color) || $length != 6) {
-                throw new VHInvalidParameterException("invalid bg-color: {$bg_color}");
+                throw new VWInvalidParameterException("invalid bg-color: {$bg_color}");
             }
             $clean['bg-color'] = $bg_color;
         }
@@ -284,7 +265,7 @@ class VWImage
         if(isset($params['alpha'])) {
             $alpha = $params['alpha'];
             if(!ctype_digit($alpha) || $alpha < 0 || $alpha > 127) {
-                throw new VHInvalidParameterException("invalid alpha: {$alpha}");
+                throw new VWInvalidParameterException("invalid alpha: {$alpha}");
             }
             $clean['alpha'] = $alpha;
         }
@@ -292,7 +273,7 @@ class VWImage
         if(isset($params['width'])) {
             $width = $params['width'];
             if(!ctype_digit($width) || !$width) {
-                throw new VHInvalidParameterException("invalid width: {$width}");
+                throw new VWInvalidParameterException("invalid width: {$width}");
             }
             $clean['width'] = $width;
         }
@@ -300,7 +281,7 @@ class VWImage
         if(isset($params['height'])) {
             $height = $params['height'];
             if(!ctype_digit($height) || !$height) {
-                throw new VHInvalidParameterException("invalid height: {$height}");
+                throw new VWInvalidParameterException("invalid height: {$height}");
             }
             $clean['height'] = $height;
         }
@@ -308,7 +289,7 @@ class VWImage
         if(isset($params['align'])) {
             $align = $params['align'];
             if(!in_array($align, array(self::ALIGN_RIGHT, self::ALIGN_CENTER, self::ALIGN_LEFT))) {
-                throw new VHInvalidParameterException("invalid align: {$align}");
+                throw new VWInvalidParameterException("invalid align: {$align}");
             }
             $clean['align'] = $align;
         }
@@ -316,7 +297,7 @@ class VWImage
         if(isset($params['valign'])) {
             $valign = $params['valign'];
             if(!in_array($valign, array(self::VALIGN_TOP, self::VALIGN_MIDDLE, self::VALIGN_BOTTOM))) {
-                throw new VHInvalidParameterException("invalid valign: {$valign}");
+                throw new VWInvalidParameterException("invalid valign: {$valign}");
             }
             $clean['valign'] = $valign;
         }
@@ -332,18 +313,11 @@ class VWImage
                 }
             }
             if(!$found) {
-                throw new VHInvalidParameterException("invalid font: {$font}");
+                throw new VWInvalidParameterException("invalid font: {$font}");
             }
             $clean['font'] = $font;
         }
 
-        if(isset($params['format'])) {
-            $format = $params['format'];
-            if(!in_array($format, array(self::PNG_FORMAT, self::GIF_FORMAT, self::JPG_FORMAT))) {
-                throw new VHInvalidParameterException("invalid format: {$format}");
-            }
-            $clean['format'] = $format;;
-        }
         return $clean;
     }
 
