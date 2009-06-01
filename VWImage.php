@@ -30,7 +30,6 @@ class VWImage
     const VALIGN_BOTTOM = 'bottom';
 
     private static $encoding    = 'utf-8';
-    private static $canvas_size = 800;
 
     private $width;     // 画像幅
     private $height;    // 画像高
@@ -41,6 +40,7 @@ class VWImage
     private $color;     // 文字色
     private $bg_color;  // 背景色
     private $alpha;     // 透過度
+    private $quality;   // 文字クオリティ
 
     private $lines;
     private $image;
@@ -62,6 +62,7 @@ class VWImage
      *  - align     : 水平位置         (right)
      *  - valign    : 垂直位置         (top)
      *  - font      : フォント         (ipam)
+     *  - quality   : 文字のクオリティ
      */
     public function __construct($string, array $params = array())
     {
@@ -80,6 +81,7 @@ class VWImage
         $this->align     = isset($params['align'])     ? $params['align']     : $default_styles['align'];
         $this->valign    = isset($params['valign'])    ? $params['valign']    : $default_styles['valign'];
         $this->font      = isset($params['font'])      ? $params['font']      : $default_styles['font'];
+        $this->quality   = isset($params['quality'])   ? $params['quality']   : $default_styles['quality'];
     }
 
     /**
@@ -184,7 +186,7 @@ class VWImage
     
     private function paste_string($string, $offset_x, $offset_y)
     {
-        $canvas_size        = self::$canvas_size;
+        $canvas_size        = $this->quality;
         $canvas             = imageCreateTrueColor($canvas_size, $canvas_size);
 
         $bg_color           = self::hex_to_rgb($this->bg_color);
@@ -202,7 +204,7 @@ class VWImage
             imageFilledRectangle($canvas, 0, 0, $canvas_size, $canvas_size, $bg_color);  // 背景色で塗りつぶして使いまわす
 
             imageLayerEffect($canvas, IMG_EFFECT_ALPHABLEND);
-            imageTTFText($canvas, $canvas_size * 72 / 96, 0, 0, $canvas_size * 0.9, $color, $this->font, $char);
+            imageTTFText($canvas, $canvas_size * 60 / 96, 0, 0, $canvas_size * 0.9, $color, $this->font, $char);
             
             // 一部の文字は回転
             if(($angle = self::get_rotate_angle($char)) !== 0) {
@@ -229,7 +231,7 @@ class VWImage
                      'bg-color'  => 'FFFFFF',
                      'alpha'     => 0,
                      'format'    => self::PNG_FORMAT,
-                     'scale'     => 2);
+                     'quality'   => 200);
     }
 
     private static function validate_params(array $params)
@@ -316,6 +318,14 @@ class VWImage
                 throw new VWInvalidParameterException("invalid font: {$font}");
             }
             $clean['font'] = $font;
+        }
+
+        if(isset($params['quality'])) {
+            $quality = $params['quality'];
+            if(!ctype_digit($quality) || !$quality) {
+                throw new VWInvalidParameterException("invalid quality: {$quality}");
+            }
+            $clean['quality'] = $quality;
         }
 
         return $clean;
